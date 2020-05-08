@@ -1,0 +1,12 @@
+module core();
+
+
+
+
+
+
+
+
+
+
+endmodule
