@@ -27,7 +27,7 @@ module cmd_decoder_arm(
     b_offset,
     b_l,
     dp_opcode,
-    dp_op2,
+    op2,
     dp_s,
     mrs_sel,
     mul_a,
@@ -94,7 +94,7 @@ output  [ 7: 0] ldrh_offset;
 
 
 
-assign  cond    = code[31:28];
+assign  cond        = code[31:28];
 
 assign  cmd_bx      = ( code[27: 4] == 24'h12fff1 );
 assign  cmd_b       = ( code[27:24] ==  4'b1010 );

@@ -129,9 +129,9 @@ cmd_decoder_arm cmd_decoder_arm(
     .cmd_ldc(cmd_ldc),
     .cmd_mrc(cmd_mrc),
     .cmd_undefine(cmd_undefine),
-    .rd(rd) 
-    .rn(rn) 
-    .rm(rm) 
+    .rd(rd),
+    .rn(rn),
+    .rm(rm), 
     .rs(rs),
     .b_offset(b_offset),
     .b_l(b_l),
