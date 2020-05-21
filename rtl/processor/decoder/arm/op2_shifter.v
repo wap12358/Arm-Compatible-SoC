@@ -94,7 +94,7 @@ end
 end
 
 
-assign  eq32 = shift_bit == 32'd32;
+assign  eq32 = ( shift_bit == 32'd32 );
 assign  lt32 = ( ( |shift_bit[31:6] ) | ( shift_bit[5] & ( |shift_bit[4:0] ) ) );
 
 

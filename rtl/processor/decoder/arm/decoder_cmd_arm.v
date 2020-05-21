@@ -1,4 +1,4 @@
-module cmd_decoder_arm(
+module decoder_cmd_arm(
     code,
     cond,
     cmd_bx,
@@ -25,9 +25,8 @@ module cmd_decoder_arm(
     rd, rn, rm, rs,
 
     b_offset,
-    b_l,
     dp_opcode,
-    op2,
+    dp_op2,
     dp_s,
     mrs_sel,
     mul_a,
@@ -37,9 +36,7 @@ module cmd_decoder_arm(
     ldr_u,
     ldr_b,
     ldr_w,
-    ldr_l,
-    ldrh_offset_sel,
-    ldrh_offset
+    ldr_l
 
 );
 
@@ -74,7 +71,6 @@ output  [ 3: 0] rd, rn, rm, rs;
 
 
 output  [ 3: 0] b_offset;
-output          b_l;
 output  [ 3: 0] dp_opcode;
 output  [12: 0] dp_op2;
 output          dp_s;
@@ -87,8 +83,6 @@ output          ldr_u;
 output          ldr_b;
 output          ldr_w;
 output          ldr_l;
-output          ldrh_offset_sel;
-output  [ 7: 0] ldrh_offset;
 
 
 
@@ -124,7 +118,6 @@ assign  rm  = code[ 3: 0];
 assign  rs  = code[11: 8];
 
 assign  b_offset    = code[23: 0];
-assign  b_l         = code[24];
 assign  dp_opcode   = code[24:21];
 assign  dp_op2      = { code[25], code[11: 0] };
 assign  dp_s        = code[20];
@@ -137,8 +130,6 @@ assign  ldr_u       = code[23];
 assign  ldr_b       = code[22];
 assign  ldr_w       = code[21];
 assign  ldr_l       = code[20];
-assign  ldrh_offset_sel = code[22];
-assign  ldrh_offset = { code[11:8], code[3:0] };
 
 
 
