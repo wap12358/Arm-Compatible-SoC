@@ -20,7 +20,8 @@ module decoder_arm(
     AHB_wr_en, AHB_rd_en,
     AHB_size,
     AHB_ldr_p, AHB_ldrs_s,
-    swi, undefined_command
+    swi, undefined_command,
+    branch
 );
 
 input   [31: 0] code;
@@ -43,6 +44,7 @@ output          AHB_wr_en, AHB_rd_en;
 output  [ 1: 0] AHB_size;
 output          AHB_ldr_p, AHB_ldrs_s;
 output          swi, undefined_command;
+output          branch;
 
 wire    [ 3: 0] cond;
 wire            cmd_bx;
@@ -130,7 +132,7 @@ decoder_cmd_arm decoder_cmd_arm(
 op2_shifter op2_shifter(
     .op2_before(op2_before),
     .op2_after(op2_after),
-    .c_in(c_in),
+    .c_in(cpsr[29]),
     .c_out(c_out),
     .r0(r0), .r1(r1), .r2(r2), .r3(r3),
     .r4(r4), .r5(r5), .r6(r6), .r7(r7),
@@ -211,7 +213,8 @@ decoder_arm_std decoder_arm_std(
     .AHB_ldr_p(AHB_ldr_p),
     .AHB_ldrs_s(AHB_ldrs_s),
     .swi(swi),
-    .undefined_command(undefined_command)
+    .undefined_command(undefined_command),
+    .branch(branch)
 
 );
 

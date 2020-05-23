@@ -59,7 +59,8 @@ module decoder_arm_std(
     iset_switch, 
     AHB_wr_en, AHB_rd_en, AHB_size,
     AHB_ldr_p, AHB_ldrs_s,
-    swi, undefined_command
+    swi, undefined_command,
+    branch
 
 );
 
@@ -122,6 +123,7 @@ output reg              AHB_wr_en, AHB_rd_en;
 output reg   [ 1: 0]    AHB_size;
 output                  AHB_ldr_p, AHB_ldrs_s;
 output reg              swi, undefined_command;
+output reg              branch;
 
 // ALU_operation
 parameter   OP1 = 4'h0;
@@ -417,6 +419,15 @@ if ( ( cond == 4'hf ) | cmd_bx | cmd_b | cmd_bl | cmd_dp | cmd_mrs | cmd_msr | c
     undefined_command = 1'b0;
 else 
     undefined_command = 1'b1;
+end
+
+// branch ( 放弃流水线上的指令 )
+always @* begin
+if ( instruction_valid & ( cmd_bx | cmd_b | cmd_bl ) ) begin
+    branch = 1'b1;
+end else begin
+    branch = 1'b0;
+end
 end
 
 // conditions & instruction_valid
