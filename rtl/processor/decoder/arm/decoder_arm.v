@@ -85,7 +85,7 @@ wire            ldr_l;
 wire    [31: 0] op2_after;
 
 
-decoder_cmd_arm decoder_cmd_arm(
+decoder_code_arm decoder_code_arm(
     .code(code),
     .cond(cond),
     .cmd_bx(cmd_bx),
