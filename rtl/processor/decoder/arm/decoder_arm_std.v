@@ -116,7 +116,7 @@ output reg   [ 3: 0]    ALU_operation;
 output reg   [ 1: 0]    mul_mode;
 output reg              rd_en, rd2_en;
 output reg   [ 4: 0]    rd_id, rd2_id;
-output reg              psr_wr_cond_en;
+output reg   [ 3: 0]    psr_wr_cond_en;
 output reg   [31: 0]    op1, op2, ops_l, ops_h;
 output                  iset_switch;
 output reg              AHB_wr_en, AHB_rd_en;
@@ -221,7 +221,7 @@ end
 
 // rd_en & rd_id
 always @* begin
-if ( cmd_bx | cmd_b | cmd_bl | cmd_dp | cmd_mrs | cmd_msr | cmd_msr_flag_only | cmd_mul | cmd_mull | 
+if ( cmd_bx | cmd_b | cmd_bl | ( cmd_dp & ( dp_opcode[3:2] != 2'b10 ) ) | cmd_mrs | cmd_msr | cmd_msr_flag_only | cmd_mul | cmd_mull | 
     ((cmd_ldr | cmd_ldrh | cmd_ldrsb | cmd_ldrsh)&ldr_b) | cmd_swp )
     rd_en = 1'b1;
 else 
@@ -264,10 +264,12 @@ end
 
 // psr_wr_cond_en
 always @* begin
-if ( ((cmd_dp|cmd_mul|cmd_mull) & dp_s) )
-    psr_wr_cond_en = 1'b1;
+if ( cmd_dp & dp_s )
+    psr_wr_cond_en = 4'b1111;
+else if ( (cmd_mul|cmd_mull) & dp_s )
+    psr_wr_cond_en = 4'b1100;
 else 
-    psr_wr_cond_en = 1'b0;
+    psr_wr_cond_en = 4'b0000;
 end
 
 

@@ -36,7 +36,7 @@ output  [ 3: 0] ALU_operation;
 output  [ 2: 0] mul_mode;
 output          rd_en, rd2_en;
 output  [ 4: 0] rd_id, rd2_id;
-output          psr_wr_cond_en;
+output  [ 3: 0] psr_wr_cond_en;
 output  [31: 0] op1, op2, ops_l, ops_h;
 output          c_out;
 output          iset_switch;
