@@ -24,7 +24,9 @@ output      [31: 0]     ahb_wr_data;
 input       [31: 0]     ahb_rd_data;
 input                   ahb_rd_vld;
 input                   ahb_busy;
-output      [ 2: 0]     ahb_data_size;
+output      [ 1: 0]     ahb_data_size;
+
+// interrupt
 
 
 
