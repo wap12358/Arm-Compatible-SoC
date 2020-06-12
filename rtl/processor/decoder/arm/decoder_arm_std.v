@@ -46,6 +46,9 @@ module decoder_arm_std(
     r8, r9, ra, rb,
     rc, rd, re, rf,
     cpsr, spsr,
+    rd_data, rd2_data, 
+    rd_en_last, rd2_en_last, 
+    rd_id_last, rd2_id_last,
 
 
     // 输出接口，标准内核操作
@@ -107,8 +110,9 @@ input           ldr_l;
 input   [31: 0]  op2_in;
 
 // 寄存器接口
-input   [31: 0] r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, ra, rb, rc, rd, re, rf, cpsr, spsr;
-
+input   [31: 0] r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, ra, rb, rc, rd, re, rf, cpsr, spsr, rd_data, rd2_data;
+input           rd_en_last, rd2_en_last;
+input   [ 4: 0] rd_id_last, rd2_id_last;
 // 输出标准内核操作
 output reg              instruction_valid;
 output reg              ALU_en, mul_en;
@@ -276,6 +280,11 @@ end
 // op1
 always @* begin
 if ( cmd_dp | cmd_mul | cmd_mull | cmd_ldr | cmd_ldrh | cmd_ldrsb | cmd_ldrsh | cmd_swp )
+    if ( rd_en_last & ( (cmd_mull|cmd_mul)?rs:rn == rd_id_last ) )
+        op1 = rd_data;
+    else if ( rd2_en_last & ( (cmd_mull|cmd_mul)?rs:rn == rd2_id_last ) )
+        op1 = rd2_data;
+    else begin
     case ((cmd_mull|cmd_mul)?rs:rn)
     4'h0: op1 = r0;
     4'h1: op1 = r1;
@@ -295,6 +304,7 @@ if ( cmd_dp | cmd_mul | cmd_mull | cmd_ldr | cmd_ldrh | cmd_ldrsb | cmd_ldrsh | 
     4'hf: op1 = rf;
     default: op1 = 32'h0;
     endcase
+    end
 else 
     op1 = 32'h0;
 end
@@ -303,6 +313,11 @@ end
 // op2
 always @* begin
 if ( cmd_bx | cmd_msr | cmd_mul | cmd_mull | cmd_ldrh | cmd_ldrsb | cmd_ldrsh )
+    if ( rd_en_last & ( rm == rd_id_last ) )
+        op2 = rd_data;
+    else if ( rd2_en_last & ( rm == rd2_id_last ) )
+        op2 = rd2_data;
+    else begin
     case (rm)
     4'h0: op2 = r0;
     4'h1: op2 = r1;
@@ -322,6 +337,7 @@ if ( cmd_bx | cmd_msr | cmd_mul | cmd_mull | cmd_ldrh | cmd_ldrsb | cmd_ldrsh )
     4'hf: op2 = rf;
     default: op2 = 32'h0;
     endcase
+    end
 else if ( cmd_b | cmd_bl )
     op2 = { 8'h00, b_offset };
 else if ( cmd_dp | cmd_msr_flag_only | cmd_ldr )
@@ -336,6 +352,11 @@ end
 // ops
 always @* begin
 if ( (cmd_mul|cmd_mull) & mul_a )
+    if ( rd_en_last & ( rd_in == rd_id_last ) )
+        ops_l = rd_data;
+    else if ( rd2_en_last & ( rd_in == rd2_id_last ) )
+        ops_l = rd2_data;
+    else begin
     case (rd_in)
     4'h0: ops_l = r0;
     4'h1: ops_l = r1;
@@ -355,11 +376,17 @@ if ( (cmd_mul|cmd_mull) & mul_a )
     4'hf: ops_l = rf;
     default: ops_l = 32'h0;
     endcase
+    end
 else 
     ops_l = 32'h0;
 end
 always @* begin
 if ( cmd_mull & mul_a )
+    if ( rd_en_last & ( rn == rd_id_last ) )
+        ops_h = rd_data;
+    else if ( rd2_en_last & ( rn == rd2_id_last ) )
+        ops_h = rd2_data;
+    else begin
     case (rn)
     4'h0: ops_h = r0;
     4'h1: ops_h = r1;
@@ -379,6 +406,7 @@ if ( cmd_mull & mul_a )
     4'hf: ops_h = rf;
     default: ops_h = 32'h0;
     endcase
+    end
 else 
     ops_h = 32'h0;
 end
