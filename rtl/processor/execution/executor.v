@@ -72,6 +72,13 @@ output  [31: 0]     reg_spsr=   mode_fiq ? spsr_fiq :
 output  [31: 0]     rd_data;
 output  [31: 0]     rd2_data;
 
+// AHB master interface
+output              AHB_wr_en, AHB_rd_en;
+output  [31: 0]     AHB_addr;
+output  [31: 0]     AHB_wr_data;
+input   [31: 0]     AHB_rd_data;
+output  [ 1: 0]     AHB_size;
+input               valid, error;
 
 // register & wire ********************************************************************
 reg     [31: 0]     r0, r1, r2, r3, r4, r5, r6, r7;
@@ -119,8 +126,8 @@ wire                cpsr_f              =   cpsr[6];
 wire                cpsr_t              =   cpsr[5];
 
 // pipeline & work_en
-reg                 work_en_bus_rd;
-wire                work_en_bus_busy;
+wire                work_en_bus_rd;
+wire                work_en_bus_rd_busy;
 wire                work_en     =   work_en_external & work_en_bus_rd & work_en_bus_busy;
 reg     [ 1: 0]     pipeline_en;
 
@@ -135,21 +142,24 @@ end else if(work_en) begin
 end
 end
 
-always @(posedge clk or negedge rst_n) begin
-if (~rst_n) begin
-    work_en_rd_bus  <= 1'b1;
-end else if (ir_cpu_restart) begin
-    work_en_rd_bus  <= 1'b1;
-end else begin
-    work_en_bus_rd  <=  cmd_AHB_rd_en   ? 1'b0 :
-                        bus_vld         ? 1'b1 :
-                                          work_en_bus_rd;
-end
-end
+//always @(posedge clk or negedge rst_n) begin
+//if (~rst_n) begin
+//    work_en_rd_bus  <= 1'b1;
+//end else if (ir_cpu_restart) begin
+//    work_en_rd_bus  <= 1'b1;
+//end else begin
+//    work_en_bus_rd  <=  cmd_AHB_rd_en   ? 1'b0 :
+//                        bus_vld         ? 1'b1 :
+//                                          work_en_bus_rd;
+//end
+//end
+
+assign  work_en_bus_rd = ~( cmd_AHB_rd_en & ~AHB_vld );
 
 assign  work_en_bus_busy = bus_busy;
 
 // basic control logic ***************************************************************
+wire    [31: 0]     result_alu, result_mull, result_mulh, result_AHBrd;
 
 
 // ALU & MUL **************************************************************************
@@ -159,7 +169,7 @@ executor_ALU alu(
     .op1(),
     .op2(),
     .c_in(),
-    .result(),
+    .result(result_alu),
     .N(),
     .Z(),
     .C(),
@@ -172,7 +182,7 @@ executor_MUL mul(
     .op2(),
     .ops_l(),
     .ops_h(),
-    .result(),
+    .result({result_mulh,resule_mull}),
     .N(),
     .Z(),
     .C(),
@@ -202,7 +212,7 @@ if (~rst_n) begin
 //    r7  <=  32'h0;
 end else begin
     r0  <=  (  rd_en & (  rd_id == 5'h0 ) ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h0 ) ) ? rd2_data      : 
+            ( rd2_en & ( rd2_id == 5'h0 ) ) ? rd2_data      :
                                               r0;
     r1  <=  (  rd_en & (  rd_id == 5'h1 ) ) ? rd_data       :
             ( rd2_en & ( rd2_id == 5'h1 ) ) ? rd2_data      : 
@@ -499,6 +509,63 @@ end
 end
 
 // data I/O ****************************************************************************
+reg     [31: 0]     AHB_wr_data_word_buf, AHB_wr_data_buf, result_AHBrd_buf;
+
+assign  AHB_wr_en   = cmd_AHB_wr_en & ~AHB_rd_en;
+assign  AHB_rd_en   = cmd_AHB_rd_en & ~AHB_rd_valid;
+assign  AHB_addr    = cmd_AHB_ldr_p ? result_alu : op1;
+always @* begin
+    case (cmd_rd2_id)
+    5'h0: AHB_wr_data_word_buf = reg_r0;
+    5'h1: AHB_wr_data_word_buf = reg_r1;
+    5'h2: AHB_wr_data_word_buf = reg_r2;
+    5'h3: AHB_wr_data_word_buf = reg_r3;
+    5'h4: AHB_wr_data_word_buf = reg_r4;
+    5'h5: AHB_wr_data_word_buf = reg_r5;
+    5'h6: AHB_wr_data_word_buf = reg_r6;
+    5'h7: AHB_wr_data_word_buf = reg_r7;
+    5'h8: AHB_wr_data_word_buf = reg_r8;
+    5'h9: AHB_wr_data_word_buf = reg_r9;
+    5'ha: AHB_wr_data_word_buf = reg_ra;
+    5'hb: AHB_wr_data_word_buf = reg_rb;
+    5'hc: AHB_wr_data_word_buf = reg_rc;
+    5'hd: AHB_wr_data_word_buf = reg_rd;
+    5'he: AHB_wr_data_word_buf = reg_re;
+    5'hf: AHB_wr_data_word_buf = reg_rf;
+    default: AHB_wr_data_word_buf = 32'h0;
+    endcase
+end
+always @* begin
+    case ( cmd_AHB_size )
+    //2'b00: AHB_wr_data_buf = AHB_wr_data_word_buf;
+    2'b10: AHB_wr_data_buf = AHB_addr[1] ? { 16'h0, AHB_wr_data_word_buf[31:16] } : { 16'h0, AHB_wr_data_word_buf[15:0] };
+    2'b11: AHB_wr_data_buf = AHB_addr[1:0] == 2'b11 ? { 24'h0, AHB_wr_data_word_buf[31:24] }    :
+                             AHB_addr[1:0] == 2'b10 ? { 24'h0, AHB_wr_data_word_buf[23:16] }    :
+                             AHB_addr[1:0] == 2'b01 ? { 24'h0, AHB_wr_data_word_buf[15: 8] }    :
+                                                      { 24'h0, AHB_wr_data_word_buf[ 7: 0] }    ;
+    default: AHB_wr_data_buf = AHB_wr_data_word_buf;
+    endcase
+end
+assign  AHB_wr_data     = AHB_wr_data_buf;
+assign  AHB_size        = cmd_AHB_size == 2'b00 ? 2'b10 :
+                          cmd_AHB_size == 2'b10 ? 2'b01 :
+                                                  2'b00 ;
+always @* begin
+    case ( cmd_AHB_size )
+    //2'b00: result_AHBrd_buf = AHB_rd_data;
+    2'b10: result_AHBrd_buf = cmd_AHB_ldrs_s ? { 16{AHB_rd_data[15]}, AHB_rd_data[15:0] } : { 16'h0, AHB_rd_data[15:0] } ;
+    2'b11: result_AHBrd_buf = cmd_AHB_ldrs_s ? { 24{AHB_rd_data[7]}, AHB_rd_data[7:0] } : { 24'h0, AHB_rd_data[7:0] } ;
+    default: result_AHBrd_buf = AHB_rd_data;
+    endcase
+end
+
+
+
+
+
+
+
+
 
 
 
