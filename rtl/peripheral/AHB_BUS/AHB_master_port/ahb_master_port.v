@@ -6,24 +6,28 @@
 
 
 
-module ahb_master_port(HCLK,HRESETn,datain,dataout,empty,full,fifo_writen,fifo_readen,tail_back,back_length,
-                    core_writen,core_readen,error,valid,rdata,
+module ahb_master_port(HCLK,HRESETn,dataout,empty,full,datain,fifo_writen,fifo_readen,tail_back,back_length,
+                    core_size,core_add,core_data,core_writen,core_readen,error,valid,rdata,
                     HREADY,HRESP,HRDATA,HGRANT,HSIZE,HADDR,HWDATA,HWRITE,HTRANS,HBURST,HBUSREQ,HLOCK,HPROT);
 
 input HCLK;
 input HRESETn;
 
 //FIFO control
-input [66:0] datain;
+//input [66:0] datain;
 input [66:0] dataout;
 input empty;
 input full;
+output [66:0]datain;
 output fifo_writen;
 output fifo_readen;
 output tail_back;
 output [4:0] back_length;
 
 //core control
+input core_size;
+input core_add;
+input core_data;
 input core_writen;
 input core_readen;
 output error;//if HRESP is ERROR, error will be high.
@@ -75,6 +79,9 @@ reg is_single_pipeline;
 //***********************************************************************************************//
 
 //output logic
+
+//fifo_datain
+assign datain={core_size,core_add,core_data};
 
 //fifo_writen
 assign fifo_writen = core_writen;
