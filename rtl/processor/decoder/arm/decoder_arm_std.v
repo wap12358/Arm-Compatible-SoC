@@ -49,6 +49,7 @@ module decoder_arm_std(
     rd_data, rd2_data, 
     rd_en_last, rd2_en_last, 
     rd_id_last, rd2_id_last,
+    cond_flag,
 
 
     // 输出接口，标准内核操作
@@ -113,6 +114,7 @@ input   [31: 0]  op2_in;
 input   [31: 0] r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, ra, rb, rc, rd, re, rf, cpsr, spsr, rd_data, rd2_data;
 input           rd_en_last, rd2_en_last;
 input   [ 4: 0] rd_id_last, rd2_id_last;
+input   [ 3: 0] cond_flag;
 // 输出标准内核操作
 output reg              instruction_valid;
 output reg              ALU_en, mul_en;
@@ -157,10 +159,10 @@ parameter   RD_SPSR_FO  = 5'h13;  // flag only
 
 
 // CPSR condition flag
-wire    N = cpsr[31];
-wire    Z = cpsr[30];
-wire    C = cpsr[29];
-wire    V = cpsr[28];
+wire    N = cond_flag[3];
+wire    Z = cond_flag[2];
+wire    C = cond_flag[1];
+wire    V = cond_flag[0];
 
 
 // 操作译码 ********************************************************************************************
@@ -439,7 +441,7 @@ assign AHB_ldrs_s   = cmd_ldrsh | cmd_ldrsb;
 
 // interrupt
 always @* begin
-if ( cmd_swi )
+if ( cmd_swi & instruction_valid )
     swi = 1'b1;
 else 
     swi = 1'b0;
