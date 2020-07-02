@@ -1,7 +1,7 @@
 module core(
     clk, rst_n, cpu_en,
     rom_en, rom_addr, rom_data,
-    ahb_rd_en, ahb_wr_en, ahb_addr, ahb_wr_data, ahb_rd_data, ahb_rd_vld, ahb_busy, ahb_data_size
+    ahb_rd_en, ahb_wr_en, ahb_addr, ahb_wr_data, ahb_rd_data, ahb_rd_vld, ahb_busy, ahb_size
 );
 
 
@@ -24,7 +24,7 @@ output      [31: 0]     ahb_wr_data;
 input       [31: 0]     ahb_rd_data;
 input                   ahb_rd_vld;
 input                   ahb_busy;
-output      [ 1: 0]     ahb_data_size;
+output      [ 1: 0]     ahb_size;
 
 // interrupt
 
@@ -88,6 +88,7 @@ cmd_decoder cmd_decoder(
     .rd(reg_rd),
     .re(reg_re),
     .rf(reg_rf),
+    .rom_pc(rom_addr),
     .cpsr(reg_cpsr),
     .spsr(reg_spsr),
     .rd_data(rd_data),
@@ -194,7 +195,7 @@ executor executor(
     .AHB_wr_data(ahb_wr_data),
     .AHB_rd_data(ahb_rd_data),
     .AHB_size(ahb_size),
-    .AHB_rd_valid(ahb_rd_valid),
+    .AHB_rd_valid(ahb_rd_vld),
     .AHB_busy(ahb_busy)
 
 );
