@@ -39,7 +39,7 @@ core core(
     .ahb_rd_data(ahb_rd_data),
     .ahb_rd_vld(ahb_rd_vld),
     .ahb_busy(ahb_busy),
-    .ahb_size(ahb_size),
+    .ahb_size(ahb_size)
 );
 
 
@@ -60,7 +60,7 @@ else;
 
 reg [31:0] data [(1'b1<<`RAM_SIZE)-1:0];
 always @ ( posedge clk )
-if ( ram_rd_en_data )
+if ( ahb_rd_en )
     ahb_rd_data <=  data[ahb_addr[`RAM_SIZE+1:2]];
 else;
 
