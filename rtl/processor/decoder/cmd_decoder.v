@@ -13,6 +13,7 @@ module cmd_decoder(
     rc,rd,re,rf,
     cpsr,spsr,
     rd_data, rd2_data,
+    cond_flag,
 
     // output
     instruction_valid,
@@ -30,9 +31,12 @@ module cmd_decoder(
 
 );
 
+input               clk, rst_n, work_en;
+
 input       [31: 0] code;
 
 input       [31: 0] r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,ra,rb,rc,rd,re,rf,cpsr,spsr,rd_data,rd2_data;
+input       [ 3: 0] cond_flag;
 
 output reg          instruction_valid;
 output reg          ALU_en,mul_en;
@@ -60,12 +64,12 @@ wire    [31: 0] r6_arm          =   cpsr[5] ? 31'h0     : r6;
 wire    [31: 0] r7_arm          =   cpsr[5] ? 31'h0     : r7;
 wire    [31: 0] r8_arm          =   cpsr[5] ? 31'h0     : r8;
 wire    [31: 0] r9_arm          =   cpsr[5] ? 31'h0     : r9;
-wire    [31: 0] r10_arm         =   cpsr[5] ? 31'h0     : r10;
-wire    [31: 0] r11_arm         =   cpsr[5] ? 31'h0     : r11;
-wire    [31: 0] r12_arm         =   cpsr[5] ? 31'h0     : r12;
-wire    [31: 0] r13_arm         =   cpsr[5] ? 31'h0     : r13;
-wire    [31: 0] r14_arm         =   cpsr[5] ? 31'h0     : r14;
-wire    [31: 0] r15_arm         =   cpsr[5] ? 31'h0     : r15;
+wire    [31: 0] r10_arm         =   cpsr[5] ? 31'h0     : ra;
+wire    [31: 0] r11_arm         =   cpsr[5] ? 31'h0     : rb;
+wire    [31: 0] r12_arm         =   cpsr[5] ? 31'h0     : rc;
+wire    [31: 0] r13_arm         =   cpsr[5] ? 31'h0     : rd;
+wire    [31: 0] r14_arm         =   cpsr[5] ? 31'h0     : re;
+wire    [31: 0] r15_arm         =   cpsr[5] ? 31'h0     : rf;
 wire    [31: 0] cpsr_arm        =   cpsr[5] ? 31'h0     : cpsr;
 wire    [31: 0] spsr_arm        =   cpsr[5] ? 31'h0     : spsr;
 wire    [31: 0] rd_data_arm     =   cpsr[5] ? 31'h0     : rd_data;
@@ -74,6 +78,7 @@ wire            rd_en_last_arm  =   cpsr[5] ?  1'h0     : rd_en;
 wire            rd2_en_last_arm =   cpsr[5] ?  1'h0     : rd2_en;
 wire    [ 4: 0] rd_id_last_arm  =   cpsr[5] ?  5'h0     : rd_id;
 wire    [ 4: 0] rd2_id_last_arm =   cpsr[5] ?  5'h0     : rd2_id;
+wire    [ 3: 0] cond_flag_arm   =   cpsr[5] ?  4'h0     : cond_flag;
 
 wire    [31: 0] code_thumb      =   cpsr[5] ? code      : 31'h0 ;
 wire    [31: 0] r0_thumb        =   cpsr[5] ? r0        : 31'h0 ;
@@ -86,20 +91,21 @@ wire    [31: 0] r6_thumb        =   cpsr[5] ? r6        : 31'h0 ;
 wire    [31: 0] r7_thumb        =   cpsr[5] ? r7        : 31'h0 ;
 wire    [31: 0] r8_thumb        =   cpsr[5] ? r8        : 31'h0 ;
 wire    [31: 0] r9_thumb        =   cpsr[5] ? r9        : 31'h0 ;
-wire    [31: 0] r10_thumb       =   cpsr[5] ? r10       : 31'h0 ;
-wire    [31: 0] r11_thumb       =   cpsr[5] ? r11       : 31'h0 ;
-wire    [31: 0] r12_thumb       =   cpsr[5] ? r12       : 31'h0 ;
-wire    [31: 0] r13_thumb       =   cpsr[5] ? r13       : 31'h0 ;
-wire    [31: 0] r14_thumb       =   cpsr[5] ? r14       : 31'h0 ;
-wire    [31: 0] r15_thumb       =   cpsr[5] ? r15       : 31'h0 ;
+wire    [31: 0] r10_thumb       =   cpsr[5] ? ra        : 31'h0 ;
+wire    [31: 0] r11_thumb       =   cpsr[5] ? rb        : 31'h0 ;
+wire    [31: 0] r12_thumb       =   cpsr[5] ? rc        : 31'h0 ;
+wire    [31: 0] r13_thumb       =   cpsr[5] ? rd        : 31'h0 ;
+wire    [31: 0] r14_thumb       =   cpsr[5] ? re        : 31'h0 ;
+wire    [31: 0] r15_thumb       =   cpsr[5] ? rf        : 31'h0 ;
 wire    [31: 0] cpsr_thumb      =   cpsr[5] ? cpsr      : 31'h0 ;
 wire    [31: 0] spsr_thumb      =   cpsr[5] ? spsr      : 31'h0 ;
-wire    [31: 0] rd_data_arm     =   cpsr[5] ? rd_data   : 31'h0 ;
-wire    [31: 0] rd2_data_arm    =   cpsr[5] ? rd2_data  : 31'h0 ;
-wire            rd_en_last_arm  =   cpsr[5] ? rd_en     :  1'h0 ;
-wire            rd2_en_last_arm =   cpsr[5] ? rd2_en    :  1'h0 ;
-wire    [ 4: 0] rd_id_last_arm  =   cpsr[5] ? rd_id     :  5'h0 ;
-wire    [ 4: 0] rd2_id_last_arm =   cpsr[5] ? rd2_id    :  5'h0 ;
+wire    [31: 0] rd_data_thumb   =   cpsr[5] ? rd_data   : 31'h0 ;
+wire    [31: 0] rd2_data_thumb  =   cpsr[5] ? rd2_data  : 31'h0 ;
+wire            rd_en_last_thumb=   cpsr[5] ? rd_en     :  1'h0 ;
+wire            rd2_en_last_thumb=  cpsr[5] ? rd2_en    :  1'h0 ;
+wire    [ 4: 0] rd_id_last_thumb=   cpsr[5] ? rd_id     :  5'h0 ;
+wire    [ 4: 0] rd2_id_last_thumb=  cpsr[5] ? rd2_id    :  5'h0 ;
+wire    [ 3: 0] cond_flag_thumb =   cpsr[5] ? cond_flag :  4'h0 ;
 
 wire            instruction_valid_arm;
 wire            ALU_en_arm,mul_en_arm;
@@ -159,6 +165,7 @@ wire            branch_thumb;
     .rd2_en_last(rd2_en_last_arm),
     .rd_id_last(rd_id_last_arm),
     .rd2_id_last(rd2_id_last_arm),
+    .cond_flag(cond_flag_arm),
     // output
     .instruction_valid(instruction_valid_arm),
     .ALU_en(ALU_en_arm),

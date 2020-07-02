@@ -7,6 +7,10 @@ module decoder_arm(
     r8, r9, r10, r11,
     r12, r13, r14, r15,
     cpsr, spsr, 
+    rd_data, rd2_data, 
+    rd_en_last, rd2_en_last, 
+    rd_id_last, rd2_id_last,
+    cond_flag,
     // output
     instruction_valid,
     ALU_en, mul_en,
@@ -27,7 +31,10 @@ module decoder_arm(
 input   [31: 0] code;
 
 input           c_in;
-input   [31: 0] r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, cpsr, spsr;
+input   [31: 0] r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, cpsr, spsr, rd_data, rd2_data;
+input           rd_en_last, rd2_en_last;
+input   [ 4: 0] rd_id_last, rd2_id_last;
+input   [ 3: 0] cond_flag;
 
 
 output          instruction_valid;
@@ -189,6 +196,10 @@ decoder_arm_std decoder_arm_std(
     .r8(r8), .r9(r9), .ra(r10), .rb(r11),
     .rc(r12), .rd(r13), .re(r14), .rf(r15),
     .cpsr(cpsr), .spsr(spsr),
+    .rd_data(rd_data), .rd2_data(rd2_data), 
+    .rd_en_last(rd_en_last), .rd2_en_last(rd2_en_last), 
+    .rd_id_last(rd_id_last), .rd2_id_last(rd2_id_last),
+    .cond_flag(cond_flag),
 
 
     // 输出接口，标准内核操作

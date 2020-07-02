@@ -1,6 +1,6 @@
 module executor(
     // basic signal
-    clk, rst_n, work_en_external,
+    clk, rst_n, work_en_external, work_en,
 
     // operation
     cmd_instruction_valid,
@@ -10,7 +10,7 @@ module executor(
     cmd_rd_en, cmd_rd2_en,
     cmd_rd_id, cmd_rd2_id,
     cmd_psr_wr_cond_en,
-    cmd_op1, cmd_op2, cmd_ops_l, cmd_ops_h,,
+    cmd_op1, cmd_op2, cmd_ops_l, cmd_ops_h,
     cmd_c_in,
     cmd_iset_switch,
     cmd_AHB_wr_en, cmd_AHB_rd_en,
@@ -19,13 +19,13 @@ module executor(
     cmd_branch,
 
     // interrupt
-    ir_cpu_restart;
-    ir_undefined_command;
-    ir_swi;
-    ir_get_cmd;
-    ir_data_process;
-    ir_irq;
-    ir_fiq;
+    ir_cpu_restart,
+    ir_undefined_command,
+    ir_swi,
+    ir_get_cmd,
+    ir_data_process,
+    ir_irq,
+    ir_fiq,
 
     // reg
     reg_r0,
@@ -58,6 +58,7 @@ module executor(
     AHB_rd_data,
     AHB_size,
     AHB_rd_valid,
+    AHB_busy
 
 );
 
@@ -68,6 +69,7 @@ module executor(
 input               clk; 
 input               rst_n; 
 input               work_en_external;
+output              work_en;
 
 // operation
 input               cmd_instruction_valid;
@@ -77,7 +79,7 @@ input   [ 1: 0]     cmd_mul_mode;
 input               cmd_rd_en, cmd_rd2_en;
 input   [ 4: 0]     cmd_rd_id, cmd_rd2_id;
 input   [ 3: 0]     cmd_psr_wr_cond_en;
-input   [31: 0]     cmd_op1, cmd_op2, cmd_ops_l, cmd_ops_h, 
+input   [31: 0]     cmd_op1, cmd_op2, cmd_ops_l, cmd_ops_h;
 input               cmd_c_in;
 input               cmd_iset_switch;
 input               cmd_AHB_wr_en, cmd_AHB_rd_en;
@@ -140,6 +142,7 @@ output  [31: 0]     AHB_wr_data;
 input   [31: 0]     AHB_rd_data;
 output  [ 1: 0]     AHB_size;
 input               AHB_rd_valid;
+input               AHB_busy;
 
 // register & wire ********************************************************************
 reg     [31: 0]     r0, r1, r2, r3, r4, r5, r6, r7;
@@ -153,7 +156,7 @@ reg     [31: 0]     r14, r14_svc, r14_abt, r14_und, r14_irq, r14_fiq;
 reg     [31: 0]     pc, pc_next;
 reg     [31: 0]     cpsr, cpsr_buf;
 reg     [31: 0]     spsr_svc, spsr_abt, spsr_und, spsr_irq, spsr_fiq;
-wire    [31: 0]     pc_next = pc + ( cpsr_t ? 3'h2 : 3'h4 );
+//wire    [31: 0]     pc_next = pc + ( cpsr_t ? 3'h2 : 3'h4 );
 wire                result_n, result_z, result_c, result_v;
 
 // parameter ***************************************************************************
@@ -189,7 +192,7 @@ wire                cpsr_t              =   cpsr[5];
 // pipeline & work_en
 wire                work_en_bus_rd;
 wire                work_en_bus_rd_busy;
-wire                work_en     =   work_en_external & work_en_bus_rd & work_en_bus_busy;
+assign              work_en     =   work_en_external & work_en_bus_rd & work_en_bus_busy;
 reg     [ 1: 0]     process_en_branch;
 wire                process_en  = process_en_branch & cmd_instruction_valid;
 
@@ -216,16 +219,16 @@ end
 //end
 //end
 
-assign  work_en_bus_rd = ~( AHB_rd_en & ~AHB_vld );
+assign  work_en_bus_rd = ~( AHB_rd_en & ~AHB_rd_valid );
 
-assign  work_en_bus_busy = bus_busy;
+assign  work_en_bus_busy = ~AHB_busy;
 
 // basic control logic ***************************************************************
 wire    [31: 0]     result_alu, result_mull, result_mulh, result_AHBrd;
 wire                result_alu_n, result_alu_z, result_alu_c, result_alu_v;
 wire                result_mul_n, result_mul_z;
-assign  [31: 0]     rd_data     = cmd_mul_en ? result_mull : result_alu;
-assign  [31: 0]     rd2_data    = AHB_rd_valid ? result_AHBrd : result_mulh;
+assign              rd_data     = cmd_mul_en ? result_mull : result_alu;
+assign              rd2_data    = AHB_rd_valid ? result_AHBrd : result_mulh;
 assign              result_n    = cmd_mul_en ? result_mul_n : result_alu_n;
 assign              result_z    = cmd_mul_en ? result_mul_z : result_alu_z;
 assign              result_c    = result_alu_c;
@@ -279,29 +282,29 @@ if (~rst_n) begin
 //    r6  <=  32'h0;
 //    r7  <=  32'h0;
 end else begin
-    r0  <=  (  rd_en & (  rd_id == 5'h0 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h0 ) & process_en ) ? rd2_data      :
+    r0  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h0 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h0 ) & process_en ) ? rd2_data      :
                                               r0;
-    r1  <=  (  rd_en & (  rd_id == 5'h1 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h1 ) & process_en ) ? rd2_data      : 
+    r1  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h1 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h1 ) & process_en ) ? rd2_data      : 
                                               r1;
-    r2  <=  (  rd_en & (  rd_id == 5'h2 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h2 ) & process_en ) ? rd2_data      : 
+    r2  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h2 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h2 ) & process_en ) ? rd2_data      : 
                                               r2;
-    r3  <=  (  rd_en & (  rd_id == 5'h3 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h3 ) & process_en ) ? rd2_data      : 
+    r3  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h3 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h3 ) & process_en ) ? rd2_data      : 
                                               r3;
-    r4  <=  (  rd_en & (  rd_id == 5'h4 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h4 ) & process_en ) ? rd2_data      : 
+    r4  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h4 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h4 ) & process_en ) ? rd2_data      : 
                                               r4;
-    r5  <=  (  rd_en & (  rd_id == 5'h5 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h5 ) & process_en ) ? rd2_data      : 
+    r5  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h5 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h5 ) & process_en ) ? rd2_data      : 
                                               r5;
-    r6  <=  (  rd_en & (  rd_id == 5'h6 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h6 ) & process_en ) ? rd2_data      : 
+    r6  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h6 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h6 ) & process_en ) ? rd2_data      : 
                                               r6;
-    r7  <=  (  rd_en & (  rd_id == 5'h7 ) & process_en ) ? rd_data       :
-            ( rd2_en & ( rd2_id == 5'h7 ) & process_en ) ? rd2_data      : 
+    r7  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h7 ) & process_en ) ? rd_data       :
+            ( cmd_rd2_en & ( cmd_rd2_id == 5'h7 ) & process_en ) ? rd2_data      : 
                                               r7;
 end
 end
@@ -330,35 +333,35 @@ if (~rst_n) begin
 //    r12     <=  32'h0;
 //    r12_fiq <=  32'h0;
 end else begin
-    r8      <=  (  rd_en & (  rd_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r8      <=  (  cmd_rd_en & (  cmd_rd_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r8;
-    r8_fiq  <=  (  rd_en & (  rd_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r8_fiq  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'h8 ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r8_fiq;
-    r9      <=  (  rd_en & (  rd_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r9      <=  (  cmd_rd_en & (  cmd_rd_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r9;
-    r9_fiq  <=  (  rd_en & (  rd_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r9_fiq  <=  (  cmd_rd_en & (  cmd_rd_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'h9 ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r9_fiq;
-    r10     <=  (  rd_en & (  rd_id == 5'ha ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'ha ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r10     <=  (  cmd_rd_en & (  cmd_rd_id == 5'ha ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'ha ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r10;
-    r10_fiq <=  (  rd_en & (  rd_id == 5'ha ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'ha ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r10_fiq <=  (  cmd_rd_en & (  cmd_rd_id == 5'ha ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'ha ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r10_fiq;
-    r11     <=  (  rd_en & (  rd_id == 5'hb ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hb ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r11     <=  (  cmd_rd_en & (  cmd_rd_id == 5'hb ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hb ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r11;
-    r11_fiq <=  (  rd_en & (  rd_id == 5'hb ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hb ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r11_fiq <=  (  cmd_rd_en & (  cmd_rd_id == 5'hb ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hb ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r11_fiq;
-    r12     <=  (  rd_en & (  rd_id == 5'hc ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hc ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r12     <=  (  cmd_rd_en & (  cmd_rd_id == 5'hc ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hc ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r12;
-    r12_fiq <=  (  rd_en & (  rd_id == 5'hc ) & ~mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hc ) & ~mode_fiq & process_en ) ? rd2_data      : 
+    r12_fiq <=  (  cmd_rd_en & (  cmd_rd_id == 5'hc ) & ~mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hc ) & ~mode_fiq & process_en ) ? rd2_data      : 
                                                               r12_fiq;
 end
 end
@@ -379,23 +382,23 @@ if (~rst_n) begin
 //    r13_irq <= 32'h0;
 //    r13_fiq <= 32'h0;
 end else begin
-    r13     <=  (  rd_en & (  rd_id == 5'hd ) & ( mode_usr | mode_sys ) & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hd ) & ( mode_usr | mode_sys ) & process_en ) ? rd2_data      :
+    r13     <=  (  cmd_rd_en & (  cmd_rd_id == 5'hd ) & ( mode_usr | mode_sys ) & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hd ) & ( mode_usr | mode_sys ) & process_en ) ? rd2_data      :
                                                                             r13;
-    r13_svc <=  (  rd_en & (  rd_id == 5'hd ) & mode_svc & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hd ) & mode_svc & process_en ) ? rd2_data      :
+    r13_svc <=  (  cmd_rd_en & (  cmd_rd_id == 5'hd ) & mode_svc & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hd ) & mode_svc & process_en ) ? rd2_data      :
                                                              r13_svc;
-    r13_abt <=  (  rd_en & (  rd_id == 5'hd ) & mode_abt & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hd ) & mode_abt & process_en ) ? rd2_data      :
+    r13_abt <=  (  cmd_rd_en & (  cmd_rd_id == 5'hd ) & mode_abt & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hd ) & mode_abt & process_en ) ? rd2_data      :
                                                              r13_abt;
-    r13_und <=  (  rd_en & (  rd_id == 5'hd ) & mode_und & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hd ) & mode_und & process_en ) ? rd2_data      :
+    r13_und <=  (  cmd_rd_en & (  cmd_rd_id == 5'hd ) & mode_und & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hd ) & mode_und & process_en ) ? rd2_data      :
                                                              r13_und;
-    r13_irq <=  (  rd_en & (  rd_id == 5'hd ) & mode_irq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hd ) & mode_irq & process_en ) ? rd2_data      :
+    r13_irq <=  (  cmd_rd_en & (  cmd_rd_id == 5'hd ) & mode_irq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hd ) & mode_irq & process_en ) ? rd2_data      :
                                                              r13_irq;
-    r13_fiq <=  (  rd_en & (  rd_id == 5'hd ) & mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'hd ) & mode_fiq & process_en ) ? rd2_data      :
+    r13_fiq <=  (  cmd_rd_en & (  cmd_rd_id == 5'hd ) & mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'hd ) & mode_fiq & process_en ) ? rd2_data      :
                                                              r13_fiq;
 end
 end
@@ -416,23 +419,23 @@ if (~rst_n) begin
 //    r14_irq <= 32'h0;
 //    r14_fiq <= 32'h0;
 end else begin // 需要考虑中断
-    r14     <=  (  rd_en & (  rd_id == 5'he ) & ( mode_usr | mode_sys ) & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'he ) & ( mode_usr | mode_sys ) & process_en ) ? rd2_data      :
+    r14     <=  (  cmd_rd_en & (  cmd_rd_id == 5'he ) & ( mode_usr | mode_sys ) & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'he ) & ( mode_usr | mode_sys ) & process_en ) ? rd2_data      :
                                                                             r14;
-    r14_svc <=  (  rd_en & (  rd_id == 5'he ) & mode_svc & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'he ) & mode_svc & process_en ) ? rd2_data      :
+    r14_svc <=  (  cmd_rd_en & (  cmd_rd_id == 5'he ) & mode_svc & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'he ) & mode_svc & process_en ) ? rd2_data      :
                                                              r14_svc;
-    r14_abt <=  (  rd_en & (  rd_id == 5'he ) & mode_abt & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'he ) & mode_abt & process_en ) ? rd2_data      :
+    r14_abt <=  (  cmd_rd_en & (  cmd_rd_id == 5'he ) & mode_abt & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'he ) & mode_abt & process_en ) ? rd2_data      :
                                                              r14_abt;
-    r14_und <=  (  rd_en & (  rd_id == 5'he ) & mode_und & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'he ) & mode_und & process_en ) ? rd2_data      :
+    r14_und <=  (  cmd_rd_en & (  cmd_rd_id == 5'he ) & mode_und & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'he ) & mode_und & process_en ) ? rd2_data      :
                                                              r14_und;
-    r14_irq <=  (  rd_en & (  rd_id == 5'he ) & mode_irq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'he ) & mode_irq & process_en ) ? rd2_data      :
+    r14_irq <=  (  cmd_rd_en & (  cmd_rd_id == 5'he ) & mode_irq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'he ) & mode_irq & process_en ) ? rd2_data      :
                                                              r14_irq;
-    r14_fiq <=  (  rd_en & (  rd_id == 5'he ) & mode_fiq & process_en ) ? rd_data       :
-                ( rd2_en & ( rd2_id == 5'he ) & mode_fiq & process_en ) ? rd2_data      :
+    r14_fiq <=  (  cmd_rd_en & (  cmd_rd_id == 5'he ) & mode_fiq & process_en ) ? rd_data       :
+                ( cmd_rd2_en & ( cmd_rd2_id == 5'he ) & mode_fiq & process_en ) ? rd2_data      :
                                                              r14_fiq;
     if (ir_fiq & ~cpsr_f & ir_data_process) begin
         r14_fiq <= 32'h10;
@@ -469,9 +472,9 @@ end else begin
         pc_next <= 32'h4;
     end else if (ir_swi) begin
         pc_next <= 32'h8;
-    end else if ( rd_en & (rd_id == 5'hf) & process_en ) begin
+    end else if ( cmd_rd_en & (cmd_rd_id == 5'hf) & process_en ) begin
         pc_next <= rd_data;
-    end else if ( rd2_en & (rd2_id == 5'hf) & process_en ) begin
+    end else if ( cmd_rd2_en & (cmd_rd2_id == 5'hf) & process_en ) begin
         pc_next <= rd2_data;
     end else if (work_en) begin
         pc_next <= pc_next;
@@ -493,10 +496,10 @@ always @* begin
 if (ir_cpu_restart) begin
     cpsr_buf    <= { cpsr[31:8], 8'b110_10011 };
 end else begin
-    cpsr_buf    <=  (  rd_en & (  rd_id == RD_CPSR    ) & process_en ) ?    rd_data :
-                    ( rd2_en & ( rd2_id == RD_CPSR    ) & process_en ) ?   rd2_data :
-                    (  rd_en & (  rd_id == RD_CPSR_FO ) & process_en ) ? {  rd_data[31:28], cpsr[27:8],  rd_data[7:0] }   :
-                    ( rd2_en & ( rd2_id == RD_CPSR_FO ) & process_en ) ? { rd2_data[31:28], cpsr[27:8], rd2_data[7:0] }   :
+    cpsr_buf    <=  (  cmd_rd_en & (  cmd_rd_id == RD_CPSR    ) & process_en ) ?    rd_data :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_CPSR    ) & process_en ) ?   rd2_data :
+                    (  cmd_rd_en & (  cmd_rd_id == RD_CPSR_FO ) & process_en ) ? {  rd_data[31:28], cpsr[27:8],  rd_data[7:0] }   :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_CPSR_FO ) & process_en ) ? { rd2_data[31:28], cpsr[27:8], rd2_data[7:0] }   :
                                                                             cpsr;
     // 标志位改变
     cpsr_buf[31]    <= cmd_psr_wr_cond_en[3] & process_en ? result_n : cpsr[31];
@@ -544,30 +547,30 @@ if (~rst_n) begin
 //    spsr_irq    <= 32'h0;
 //    spsr_fiq    <= 32'h0;
 end else begin
-    spsr_svc    <=  (  rd_en & (  rd_id == RD_SPSR    ) & mode_svc & process_en ) ?    rd_data :
-                    ( rd2_en & ( rd2_id == RD_SPSR    ) & mode_svc & process_en ) ?   rd2_data :
-                    (  rd_en & (  rd_id == RD_SPSR_FO ) & mode_svc & process_en ) ? {  rd_data[31:28], spsr_svc[27:8],  rd_data[7:0] }   :
-                    ( rd2_en & ( rd2_id == RD_SPSR_FO ) & mode_svc & process_en ) ? { rd2_data[31:28], spsr_svc[27:8], rd2_data[7:0] }   :
+    spsr_svc    <=  (  cmd_rd_en & (  cmd_rd_id == RD_SPSR    ) & mode_svc & process_en ) ?    rd_data :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR    ) & mode_svc & process_en ) ?   rd2_data :
+                    (  cmd_rd_en & (  cmd_rd_id == RD_SPSR_FO ) & mode_svc & process_en ) ? {  rd_data[31:28], spsr_svc[27:8],  rd_data[7:0] }   :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR_FO ) & mode_svc & process_en ) ? { rd2_data[31:28], spsr_svc[27:8], rd2_data[7:0] }   :
                                                                          spsr_svc;
-    spsr_abt    <=  (  rd_en & (  rd_id == RD_SPSR    ) & mode_abt & process_en ) ?    rd_data :
-                    ( rd2_en & ( rd2_id == RD_SPSR    ) & mode_abt & process_en ) ?   rd2_data :
-                    (  rd_en & (  rd_id == RD_SPSR_FO ) & mode_abt & process_en ) ? {  rd_data[31:28], spsr_abt[27:8],  rd_data[7:0] }   :
-                    ( rd2_en & ( rd2_id == RD_SPSR_FO ) & mode_abt & process_en ) ? { rd2_data[31:28], spsr_abt[27:8], rd2_data[7:0] }   :
+    spsr_abt    <=  (  cmd_rd_en & (  cmd_rd_id == RD_SPSR    ) & mode_abt & process_en ) ?    rd_data :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR    ) & mode_abt & process_en ) ?   rd2_data :
+                    (  cmd_rd_en & (  cmd_rd_id == RD_SPSR_FO ) & mode_abt & process_en ) ? {  rd_data[31:28], spsr_abt[27:8],  rd_data[7:0] }   :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR_FO ) & mode_abt & process_en ) ? { rd2_data[31:28], spsr_abt[27:8], rd2_data[7:0] }   :
                                                                          spsr_abt;
-    spsr_und    <=  (  rd_en & (  rd_id == RD_SPSR    ) & mode_und & process_en ) ?    rd_data :
-                    ( rd2_en & ( rd2_id == RD_SPSR    ) & mode_und & process_en ) ?   rd2_data :
-                    (  rd_en & (  rd_id == RD_SPSR_FO ) & mode_und & process_en ) ? {  rd_data[31:28], spsr_und[27:8],  rd_data[7:0] }   :
-                    ( rd2_en & ( rd2_id == RD_SPSR_FO ) & mode_und & process_en ) ? { rd2_data[31:28], spsr_und[27:8], rd2_data[7:0] }   :
+    spsr_und    <=  (  cmd_rd_en & (  cmd_rd_id == RD_SPSR    ) & mode_und & process_en ) ?    rd_data :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR    ) & mode_und & process_en ) ?   rd2_data :
+                    (  cmd_rd_en & (  cmd_rd_id == RD_SPSR_FO ) & mode_und & process_en ) ? {  rd_data[31:28], spsr_und[27:8],  rd_data[7:0] }   :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR_FO ) & mode_und & process_en ) ? { rd2_data[31:28], spsr_und[27:8], rd2_data[7:0] }   :
                                                                          spsr_und;
-    spsr_irq    <=  (  rd_en & (  rd_id == RD_SPSR    ) & mode_irq & process_en ) ?    rd_data :
-                    ( rd2_en & ( rd2_id == RD_SPSR    ) & mode_irq & process_en ) ?   rd2_data :
-                    (  rd_en & (  rd_id == RD_SPSR_FO ) & mode_irq & process_en ) ? {  rd_data[31:28], spsr_irq[27:8],  rd_data[7:0] }   :
-                    ( rd2_en & ( rd2_id == RD_SPSR_FO ) & mode_irq & process_en ) ? { rd2_data[31:28], spsr_irq[27:8], rd2_data[7:0] }   :
+    spsr_irq    <=  (  cmd_rd_en & (  cmd_rd_id == RD_SPSR    ) & mode_irq & process_en ) ?    rd_data :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR    ) & mode_irq & process_en ) ?   rd2_data :
+                    (  cmd_rd_en & (  cmd_rd_id == RD_SPSR_FO ) & mode_irq & process_en ) ? {  rd_data[31:28], spsr_irq[27:8],  rd_data[7:0] }   :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR_FO ) & mode_irq & process_en ) ? { rd2_data[31:28], spsr_irq[27:8], rd2_data[7:0] }   :
                                                                          spsr_irq;
-    spsr_fiq    <=  (  rd_en & (  rd_id == RD_SPSR    ) & mode_fiq & process_en ) ?    rd_data :
-                    ( rd2_en & ( rd2_id == RD_SPSR    ) & mode_fiq & process_en ) ?   rd2_data :
-                    (  rd_en & (  rd_id == RD_SPSR_FO ) & mode_fiq & process_en ) ? {  rd_data[31:28], spsr_fiq[27:8],  rd_data[7:0] }   :
-                    ( rd2_en & ( rd2_id == RD_SPSR_FO ) & mode_fiq & process_en ) ? { rd2_data[31:28], spsr_fiq[27:8], rd2_data[7:0] }   :
+    spsr_fiq    <=  (  cmd_rd_en & (  cmd_rd_id == RD_SPSR    ) & mode_fiq & process_en ) ?    rd_data :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR    ) & mode_fiq & process_en ) ?   rd2_data :
+                    (  cmd_rd_en & (  cmd_rd_id == RD_SPSR_FO ) & mode_fiq & process_en ) ? {  rd_data[31:28], spsr_fiq[27:8],  rd_data[7:0] }   :
+                    ( cmd_rd2_en & ( cmd_rd2_id == RD_SPSR_FO ) & mode_fiq & process_en ) ? { rd2_data[31:28], spsr_fiq[27:8], rd2_data[7:0] }   :
                                                                          spsr_fiq;
     if (ir_fiq & ~cpsr_f & ir_data_process) begin
         spsr_abt    <= cpsr;
@@ -593,7 +596,7 @@ reg     [31: 0]     AHB_wr_data_word_buf, AHB_wr_data_buf, result_AHBrd_buf;
 
 assign  AHB_wr_en   = cmd_AHB_wr_en & ~AHB_rd_en & process_en;
 assign  AHB_rd_en   = cmd_AHB_rd_en & ~AHB_rd_valid & process_en;
-assign  AHB_addr    = cmd_AHB_ldr_p ? result_alu : op1;
+assign  AHB_addr    = cmd_AHB_ldr_p ? result_alu : cmd_op1;
 always @* begin
     case (cmd_rd2_id)
     5'h0: AHB_wr_data_word_buf = reg_r0;
@@ -633,8 +636,8 @@ assign  AHB_size        = cmd_AHB_size == 2'b00 ? 2'b10 :
 always @* begin
     case ( cmd_AHB_size )
     //2'b00: result_AHBrd_buf = AHB_rd_data;
-    2'b10: result_AHBrd_buf = cmd_AHB_ldrs_s ? { 16{AHB_rd_data[15]}, AHB_rd_data[15:0] } : { 16'h0, AHB_rd_data[15:0] } ;
-    2'b11: result_AHBrd_buf = cmd_AHB_ldrs_s ? { 24{AHB_rd_data[7]}, AHB_rd_data[7:0] } : { 24'h0, AHB_rd_data[7:0] } ;
+    2'b10: result_AHBrd_buf = cmd_AHB_ldrs_s ? { {16{AHB_rd_data[15]}}, AHB_rd_data[15:0] } : { 16'h0, AHB_rd_data[15:0] } ;
+    2'b11: result_AHBrd_buf = cmd_AHB_ldrs_s ? { {24{AHB_rd_data[7]}}, AHB_rd_data[7:0] } : { 24'h0, AHB_rd_data[7:0] } ;
     default: result_AHBrd_buf = AHB_rd_data;
     endcase
 end

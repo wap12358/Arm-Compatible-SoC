@@ -80,6 +80,6 @@ assign  result_SBC  =  { 1'b1, op1_SBC | op1_RSC } - ( op2_SBC | op2_RSC ) - ~c_
 assign  {C,result}  =  result_OP1 | result_OP2 | result_AND | result_ORR | result_EOR | result_BIC | result_MVN | result_ADD | result_ADC | result_SUB | result_SBC;
 assign  N           =  result[31];
 assign  Z           =  ~|result;
-assign  V           = 
+assign  V           =  1'b0;
 
 endmodule
