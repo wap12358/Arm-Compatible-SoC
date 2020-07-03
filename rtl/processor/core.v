@@ -1,7 +1,8 @@
 module core(
     clk, rst_n, cpu_en,
     rom_en, rom_addr, rom_data,
-    ahb_rd_en, ahb_wr_en, ahb_addr, ahb_wr_data, ahb_rd_data, ahb_rd_vld, ahb_busy, ahb_size
+    ahb_rd_en, ahb_wr_en, ahb_addr, ahb_wr_data, ahb_rd_data, ahb_rd_vld, ahb_busy, ahb_size,
+    ir_cpu_restart, ir_data_process, ir_irq, ir_fiq
 );
 
 
@@ -27,6 +28,10 @@ input                   ahb_busy;
 output      [ 1: 0]     ahb_size;
 
 // interrupt
+input                   ir_cpu_restart;
+input                   ir_data_process;
+input                   ir_irq;
+input                   ir_fiq;
 
 
 
@@ -52,13 +57,9 @@ wire                    cmd_AHB_ldr_p, cmd_AHB_ldrs_s;
 wire                    cmd_branch;
 
 // interrupt
-wire                    ir_cpu_restart;
 wire                    ir_undefined_command;
 wire                    ir_swi;
 wire                    ir_get_cmd;
-wire                    ir_data_process;
-wire                    ir_irq;
-wire                    ir_fiq;
 
 
 cmd_decoder cmd_decoder(
