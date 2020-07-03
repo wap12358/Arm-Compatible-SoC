@@ -2,7 +2,11 @@ module core(
     clk, rst_n, cpu_en,
     rom_en, rom_addr, rom_data,
     ahb_rd_en, ahb_wr_en, ahb_addr, ahb_wr_data, ahb_rd_data, ahb_rd_vld, ahb_busy, ahb_size,
+<<<<<<< HEAD
     ir_cpu_restart,ir_data_process,ir_irq,ir_fiq
+=======
+    ir_cpu_restart, ir_data_process, ir_irq, ir_fiq
+>>>>>>> 2fbd86cf3ef3b4f664b051148cbe2a77ed6409ac
 );
 
 
