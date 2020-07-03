@@ -1,4 +1,4 @@
-module ahb_master_top(HCLK,HRESETn,core_size,core_add,core_data,core_writen,core_readen,error,valid,rdata,
+module ahb_master_top(HCLK,HRESETn,core_size,core_add,core_data,core_writen,core_readen,error,busy,valid,rdata,
                     HREADY,HRESP,HRDATA,HGRANT,HSIZE,HADDR,HWDATA,HWRITE,HTRANS,HBURST,HBUSREQ,HLOCK,HPROT);
 
 input HCLK;
@@ -12,6 +12,7 @@ input core_data;
 input core_writen;
 input core_readen;
 output error;
+output busy;
 output valid;
 output [31:0] rdata;
 
@@ -45,7 +46,7 @@ ahb_master_port ahb_master_port(.HCLK(HCLK),.HRESETn(HRESETn),
                         .dataout(dataout),.empty(empty),.full(full),.datain(datain),
                         .fifo_writen(fifo_writen),.fifo_readen(fifo_readen),.tail_back(tail_back),.back_length(back_length),
                         .core_size(core_size),.core_add(core_add),.core_data(core_data),
-                        .core_writen(core_writen),.core_readen(core_readen),.error(error),.valid(valid),.rdata(rdata),
+                        .core_writen(core_writen),.core_readen(core_readen),.error(error),.busy(busy),.valid(valid),.rdata(rdata),
                         .HREADY(HREADY),.HRESP(HRESP),.HRDATA(HRDATA),.HGRANT(HGRANT),.HSIZE(HSIZE),
                         .HADDR(HADDR),.HWDATA(HWDATA),.HWRITE(HWRITE),.HTRANS(HTRANS),.HBURST(HBURST),
 								.HBUSREQ(HBUSREQ),.HLOCK(HLOCK),.HPROT(HPROT));

@@ -7,7 +7,7 @@
 
 
 module ahb_master_port(HCLK,HRESETn,dataout,empty,full,datain,fifo_writen,fifo_readen,tail_back,back_length,
-                    core_size,core_add,core_data,core_writen,core_readen,error,valid,rdata,
+                    core_size,core_add,core_data,core_writen,core_readen,error,busy,valid,rdata,
                     HREADY,HRESP,HRDATA,HGRANT,HSIZE,HADDR,HWDATA,HWRITE,HTRANS,HBURST,HBUSREQ,HLOCK,HPROT);
 
 input HCLK;
@@ -31,6 +31,7 @@ input core_data;
 input core_writen;
 input core_readen;
 output error;//if HRESP is ERROR, error will be high.
+output busy;//when fifo is full
 output valid;//when bus transfer rdata to core, valid will be high in one cycle
 output [31:0] rdata;
 
@@ -129,6 +130,9 @@ end
 
 //error
 assign error = HRESP == 2'b01;
+
+//busy
+assign busy = full;
 
 //valid
 assign valid = HREADY && is_waitting_rdata;
